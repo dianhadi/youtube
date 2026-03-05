@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,8 +42,15 @@ type DownloadResponse struct {
 }
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	}))
+	slog.SetDefault(logger)
+
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		log.Fatalf("Failed to create output dir: %v", err)
+		slog.Error("failed to create output dir", "err", err)
+		os.Exit(1)
 	}
 
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -51,9 +58,10 @@ func main() {
 	http.HandleFunc("/api/download", handleDownload)
 
 	port := "8080"
-	log.Printf("Server running at http://localhost:%s", port)
+	slog.Info("server running", "url", "http://localhost:"+port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+		slog.Error("server error", "err", err)
+		os.Exit(1)
 	}
 }
 
@@ -66,12 +74,17 @@ func handleFormats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("fetching video info", "url", videoURL)
+
 	client := youtube.Client{}
 	video, err := client.GetVideo(videoURL)
 	if err != nil {
+		slog.Error("GetVideo failed", "url", videoURL, "err", err)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+
+	slog.Info("video found", "title", video.Title, "id", video.ID, "formats", len(video.Formats))
 
 	var formats []FormatInfo
 	seen := map[string]bool{}
@@ -130,12 +143,17 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("download request", "url", req.URL, "itag", req.Itag)
+
 	client := youtube.Client{}
 	video, err := client.GetVideo(req.URL)
 	if err != nil {
+		slog.Error("GetVideo failed", "url", req.URL, "err", err)
 		json.NewEncoder(w).Encode(DownloadResponse{Error: err.Error()})
 		return
 	}
+
+	slog.Info("video found", "title", video.Title, "id", video.ID)
 
 	var selectedFormat *youtube.Format
 	for i, f := range video.Formats {
@@ -146,16 +164,37 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if selectedFormat == nil {
+		slog.Warn("itag not found", "itag", req.Itag, "total_formats", len(video.Formats))
 		json.NewEncoder(w).Encode(DownloadResponse{Error: "format not found"})
 		return
 	}
 
+	slog.Debug("selected format",
+		"itag", selectedFormat.ItagNo,
+		"mime", selectedFormat.MimeType,
+		"quality", selectedFormat.QualityLabel,
+		"url_len", len(selectedFormat.URL),
+	)
+	if selectedFormat.URL == "" {
+		slog.Warn("format URL is empty, may require decryption or is unavailable",
+			"itag", selectedFormat.ItagNo,
+			"mime", selectedFormat.MimeType,
+		)
+	}
+
+	slog.Info("opening stream", "itag", selectedFormat.ItagNo)
 	stream, _, err := client.GetStream(video, selectedFormat)
 	if err != nil {
+		slog.Error("GetStream failed",
+			"itag", selectedFormat.ItagNo,
+			"mime", selectedFormat.MimeType,
+			"err", err,
+		)
 		json.NewEncoder(w).Encode(DownloadResponse{Error: err.Error()})
 		return
 	}
 	defer stream.Close()
+	slog.Info("stream opened", "itag", selectedFormat.ItagNo)
 
 	ext := "mp4"
 	mimeBase := strings.Split(selectedFormat.MimeType, ";")[0]
@@ -172,18 +211,22 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 
 	outFile, err := os.Create(outPath)
 	if err != nil {
+		slog.Error("failed to create output file", "path", outPath, "err", err)
 		json.NewEncoder(w).Encode(DownloadResponse{Error: err.Error()})
 		return
 	}
 	defer outFile.Close()
 
-	if _, err := io.Copy(outFile, stream); err != nil {
+	slog.Info("writing file", "path", outPath)
+	n, err := io.Copy(outFile, stream)
+	if err != nil {
+		slog.Error("io.Copy failed", "path", outPath, "bytes_written", n, "err", err)
 		os.Remove(outPath)
 		json.NewEncoder(w).Encode(DownloadResponse{Error: err.Error()})
 		return
 	}
 
-	log.Printf("Downloaded: %s", outPath)
+	slog.Info("download complete", "path", outPath, "size_mb", fmt.Sprintf("%.2f", float64(n)/1024/1024))
 	json.NewEncoder(w).Encode(DownloadResponse{Success: true, Filename: filename})
 }
 
