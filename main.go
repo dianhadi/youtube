@@ -1,15 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -29,12 +30,6 @@ type VideoInfo struct {
 	Title   string       `json:"title"`
 	Author  string       `json:"author"`
 	Formats []FormatInfo `json:"formats"`
-}
-
-type DownloadRequest struct {
-	URL       string `json:"url"`
-	Itag      string `json:"itag"`
-	VideoOnly bool   `json:"videoOnly"`
 }
 
 type DownloadResponse struct {
@@ -129,7 +124,6 @@ func handleFormats(w http.ResponseWriter, r *http.Request) {
 		if seen[f.FormatID] {
 			continue
 		}
-		// Skip storyboard/manifest formats
 		if f.Ext == "mhtml" || f.Ext == "none" || (f.ACodec == "none" && f.VCodec == "none") {
 			continue
 		}
@@ -169,68 +163,141 @@ func handleFormats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleDownload streams download progress via Server-Sent Events (GET).
+// Query params: url, itag, videoOnly (true/false)
 func handleDownload(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(DownloadResponse{Error: "method not allowed"})
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	var req DownloadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		json.NewEncoder(w).Encode(DownloadResponse{Error: "invalid request body"})
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	send := func(v any) {
+		b, _ := json.Marshal(v)
+		fmt.Fprintf(w, "data: %s\n\n", b)
+		flusher.Flush()
+	}
+
+	videoURL := r.URL.Query().Get("url")
+	itag := r.URL.Query().Get("itag")
+	videoOnly := r.URL.Query().Get("videoOnly") == "true"
+
+	if videoURL == "" || itag == "" {
+		send(map[string]string{"type": "error", "message": "url and itag are required"})
 		return
 	}
 
-	if req.URL == "" || req.Itag == "" {
-		json.NewEncoder(w).Encode(DownloadResponse{Error: "url and itag are required"})
-		return
-	}
+	slog.Info("download request", "url", videoURL, "itag", itag, "video_only", videoOnly)
 
-	slog.Info("download request", "url", req.URL, "itag", req.Itag, "video_only", req.VideoOnly)
-
-	formatSpec := req.Itag
-	if req.VideoOnly {
-		formatSpec = req.Itag + "+bestaudio[ext=m4a]/bestaudio"
+	formatSpec := itag
+	if videoOnly {
+		formatSpec = itag + "+bestaudio[ext=m4a]/bestaudio"
 	}
 
 	outTemplate := filepath.Join(outputDir, "%(title).100B_%(format_id)s.%(ext)s")
 
-	var stdout, stderr bytes.Buffer
+	var stdoutBuf bytes.Buffer
 	cmd := exec.Command("yt-dlp",
 		"-f", formatSpec,
 		"--merge-output-format", "mp4",
 		"-o", outTemplate,
 		"--no-part",
+		"--newline",
 		"--print", "after_move:filepath",
 		"--no-playlist",
-		req.URL,
+		videoURL,
 	)
-	cmd.Stdout = &stdout
-	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr) // real-time progress + capture for errors
+	cmd.Stdout = &stdoutBuf
 
-	slog.Info("running yt-dlp", "format", formatSpec)
-
-	if err := cmd.Run(); err != nil {
-		errMsg := strings.TrimSpace(stderr.String())
-		// yt-dlp writes full progress to stderr; extract just the last error line
-		if lines := strings.Split(errMsg, "\n"); len(lines) > 0 {
-			for i := len(lines) - 1; i >= 0; i-- {
-				if strings.Contains(lines[i], "ERROR") {
-					errMsg = strings.TrimSpace(lines[i])
-					break
-				}
-			}
-		}
-		slog.Error("yt-dlp failed", "err", err, "msg", errMsg)
-		json.NewEncoder(w).Encode(DownloadResponse{Error: errMsg})
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		send(map[string]string{"type": "error", "message": err.Error()})
 		return
 	}
 
-	outPath := strings.TrimSpace(stdout.String())
+	if err := cmd.Start(); err != nil {
+		send(map[string]string{"type": "error", "message": err.Error()})
+		return
+	}
+
+	slog.Info("yt-dlp started", "format", formatSpec)
+
+	// Track which phase (video download → audio download → merge)
+	downloadPhase := 0 // 0=video, 1=audio
+	var lastErrLine string
+
+	scanner := bufio.NewScanner(stderrPipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+		slog.Debug("yt-dlp", "line", line)
+
+		switch {
+		case strings.HasPrefix(line, "[download] Destination:"):
+			// New file being downloaded — advance phase on second occurrence
+			if downloadPhase > 0 {
+				downloadPhase++
+			} else {
+				downloadPhase = 1
+			}
+
+		case strings.HasPrefix(line, "[download]") && strings.Contains(line, "%"):
+			pct, speed, eta := parseProgress(line)
+			phase := "video"
+			if videoOnly && downloadPhase > 1 {
+				phase = "audio"
+			}
+			send(map[string]any{
+				"type":  "progress",
+				"phase": phase,
+				"pct":   pct,
+				"speed": speed,
+				"eta":   eta,
+			})
+
+		case strings.HasPrefix(line, "[Merger]") || strings.HasPrefix(line, "[ffmpeg]"):
+			send(map[string]any{"type": "merging"})
+
+		case strings.Contains(line, "ERROR"):
+			lastErrLine = line
+			slog.Error("yt-dlp error line", "line", line)
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		msg := lastErrLine
+		if msg == "" {
+			msg = err.Error()
+		}
+		slog.Error("yt-dlp failed", "err", err, "msg", msg)
+		send(map[string]string{"type": "error", "message": msg})
+		return
+	}
+
+	outPath := strings.TrimSpace(stdoutBuf.String())
 	filename := filepath.Base(outPath)
 	slog.Info("download complete", "path", outPath)
-	json.NewEncoder(w).Encode(DownloadResponse{Success: true, Filename: filename})
+	send(map[string]any{"type": "done", "filename": filename})
+}
+
+// parseProgress extracts pct, speed, eta from a yt-dlp [download] progress line.
+func parseProgress(line string) (pct float64, speed, eta string) {
+	parts := strings.Fields(line)
+	// parts: ["[download]", "23.4%", "of", "1.10GiB", "at", "5.23MiB/s", "ETA", "03:12"]
+	if len(parts) < 2 {
+		return
+	}
+	pct, _ = strconv.ParseFloat(strings.TrimSuffix(parts[1], "%"), 64)
+	for i, p := range parts {
+		if p == "at" && i+1 < len(parts) {
+			speed = parts[i+1]
+		}
+		if p == "ETA" && i+1 < len(parts) {
+			eta = parts[i+1]
+		}
+	}
+	return
 }

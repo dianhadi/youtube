@@ -69,13 +69,8 @@
       transition: border-color 0.2s;
     }
 
-    input[type="text"]:focus {
-      border-color: #ff4444;
-    }
-
-    input[type="text"]::placeholder {
-      color: #555;
-    }
+    input[type="text"]:focus { border-color: #ff4444; }
+    input[type="text"]::placeholder { color: #555; }
 
     button {
       padding: 12px 20px;
@@ -91,11 +86,7 @@
     button:active { transform: scale(0.97); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .btn-primary {
-      background: #ff4444;
-      color: #fff;
-    }
-
+    .btn-primary { background: #ff4444; color: #fff; }
     .btn-primary:hover:not(:disabled) { opacity: 0.85; }
 
     .btn-download {
@@ -107,7 +98,6 @@
       border-radius: 10px;
       margin-top: 20px;
     }
-
     .btn-download:hover:not(:disabled) { opacity: 0.85; }
 
     /* Video info */
@@ -118,17 +108,8 @@
       margin-bottom: 20px;
       display: none;
     }
-
-    #video-title {
-      font-weight: 700;
-      font-size: 1rem;
-      margin-bottom: 4px;
-    }
-
-    #video-author {
-      font-size: 0.8rem;
-      color: #888;
-    }
+    #video-title { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+    #video-author { font-size: 0.8rem; color: #888; }
 
     /* Format list */
     #format-section { display: none; }
@@ -140,7 +121,6 @@
       overflow-y: auto;
       padding-right: 4px;
     }
-
     .format-grid::-webkit-scrollbar { width: 4px; }
     .format-grid::-webkit-scrollbar-track { background: #1a1a1a; }
     .format-grid::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
@@ -156,10 +136,8 @@
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
-
     .format-item:hover { background: #2e2e2e; }
     .format-item.selected { border-color: #ff4444; background: #2a1a1a; }
-
     .format-item input[type="radio"] { display: none; }
 
     .format-badge {
@@ -170,24 +148,69 @@
       min-width: 56px;
       text-align: center;
     }
-
-    .badge-video { background: #1e3a5f; color: #60a5fa; }
+    .badge-video      { background: #1e3a5f; color: #60a5fa; }
     .badge-video-only { background: #3a2a0a; color: #fbbf24; }
-    .badge-audio { background: #1e3d2f; color: #4ade80; }
+    .badge-audio      { background: #1e3d2f; color: #4ade80; }
 
-    .format-detail {
-      flex: 1;
+    .format-detail { flex: 1; }
+    .format-res { font-size: 0.9rem; font-weight: 600; }
+    .format-meta { font-size: 0.75rem; color: #666; margin-top: 2px; }
+
+    /* Progress */
+    #progress-section {
+      margin-top: 20px;
+      display: none;
     }
 
-    .format-res {
-      font-size: 0.9rem;
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .progress-phase {
+      font-size: 0.85rem;
       font-weight: 600;
+      color: #60a5fa;
     }
 
-    .format-meta {
+    .progress-pct {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f1f1f1;
+    }
+
+    .progress-track {
+      background: #2a2a2a;
+      border-radius: 99px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar.merging {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      width: 100%;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .progress-meta {
+      margin-top: 6px;
       font-size: 0.75rem;
-      color: #666;
-      margin-top: 2px;
+      color: #555;
     }
 
     /* Status */
@@ -206,18 +229,8 @@
       align-items: center;
       gap: 10px;
     }
-
-    #status.success {
-      background: #1a2f1f;
-      color: #4ade80;
-      display: block;
-    }
-
-    #status.error {
-      background: #2f1a1a;
-      color: #f87171;
-      display: block;
-    }
+    #status.success { background: #1a2f1f; color: #4ade80; display: block; }
+    #status.error   { background: #2f1a1a; color: #f87171; display: block; }
 
     .spinner {
       width: 16px;
@@ -228,7 +241,6 @@
       animation: spin 0.7s linear infinite;
       flex-shrink: 0;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .section-title {
@@ -248,12 +260,7 @@
 
     <label for="url-input">URL Video</label>
     <div class="input-row">
-      <input
-        type="text"
-        id="url-input"
-        placeholder="https://www.youtube.com/watch?v=..."
-        autofocus
-      />
+      <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=..." autofocus />
       <button class="btn-primary" id="fetch-btn" onclick="fetchFormats()">Cek Format</button>
     </div>
 
@@ -270,12 +277,25 @@
       </button>
     </div>
 
+    <div id="progress-section">
+      <div class="progress-header">
+        <span class="progress-phase" id="progress-phase">Mempersiapkan...</span>
+        <span class="progress-pct" id="progress-pct"></span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-meta" id="progress-meta"></div>
+    </div>
+
     <div id="status"></div>
   </div>
 
   <script>
     let selectedItag = null;
+    let selectedVideoOnly = false;
     let currentURL = '';
+    let activeES = null;
 
     function setStatus(type, msg) {
       const el = document.getElementById('status');
@@ -294,17 +314,54 @@
       el.className = '';
     }
 
+    function showProgress(phase, pct, speed, eta) {
+      document.getElementById('progress-section').style.display = 'block';
+      const bar = document.getElementById('progress-bar');
+      bar.classList.remove('merging');
+
+      const phaseLabels = {
+        video: 'Mengunduh video...',
+        audio: 'Mengunduh audio...',
+      };
+      document.getElementById('progress-phase').textContent = phaseLabels[phase] || 'Mengunduh...';
+      document.getElementById('progress-pct').textContent = pct.toFixed(1) + '%';
+      bar.style.width = pct + '%';
+
+      const parts = [];
+      if (speed) parts.push(speed);
+      if (eta && eta !== 'Unknown') parts.push('ETA ' + eta);
+      document.getElementById('progress-meta').textContent = parts.join(' · ');
+    }
+
+    function showMerging() {
+      document.getElementById('progress-section').style.display = 'block';
+      document.getElementById('progress-phase').textContent = 'Menggabungkan video + audio...';
+      document.getElementById('progress-pct').textContent = '';
+      document.getElementById('progress-meta').textContent = '';
+      document.getElementById('progress-bar').classList.add('merging');
+    }
+
+    function hideProgress() {
+      document.getElementById('progress-section').style.display = 'none';
+      document.getElementById('progress-bar').style.width = '0%';
+      document.getElementById('progress-bar').classList.remove('merging');
+    }
+
     async function fetchFormats() {
       const url = document.getElementById('url-input').value.trim();
       if (!url) { setStatus('error', 'URL tidak boleh kosong.'); return; }
 
+      if (activeES) { activeES.close(); activeES = null; }
+
       currentURL = url;
       selectedItag = null;
+      selectedVideoOnly = false;
 
       document.getElementById('fetch-btn').disabled = true;
       document.getElementById('video-info').style.display = 'none';
       document.getElementById('format-section').style.display = 'none';
       document.getElementById('download-btn').disabled = true;
+      hideProgress();
       setStatus('loading', 'Mengambil informasi video...');
 
       try {
@@ -331,29 +388,23 @@
       const list = document.getElementById('format-list');
       list.innerHTML = '';
 
-      // Sort: video first (highest res), then audio
       const videos = formats.filter(f => !f.audioOnly).sort((a, b) => {
         const ra = parseInt(a.resolution) || 0;
         const rb = parseInt(b.resolution) || 0;
         return rb - ra;
       });
       const audios = formats.filter(f => f.audioOnly);
-      const sorted = [...videos, ...audios];
 
-      sorted.forEach(f => {
+      [...videos, ...audios].forEach(f => {
         const item = document.createElement('label');
         item.className = 'format-item';
         item.dataset.itag = f.itag;
         item.dataset.videoOnly = f.videoOnly;
 
         let badgeClass, badgeText;
-        if (f.audioOnly) {
-          badgeClass = 'badge-audio'; badgeText = 'Audio';
-        } else if (f.videoOnly) {
-          badgeClass = 'badge-video-only'; badgeText = 'HD';
-        } else {
-          badgeClass = 'badge-video'; badgeText = 'Video';
-        }
+        if (f.audioOnly)       { badgeClass = 'badge-audio';      badgeText = 'Audio'; }
+        else if (f.videoOnly)  { badgeClass = 'badge-video-only'; badgeText = 'HD';    }
+        else                   { badgeClass = 'badge-video';      badgeText = 'Video'; }
 
         const fps = f.fps && !f.audioOnly ? ` · ${f.fps}fps` : '';
         const mime = f.mimeType.split('/')[1] || f.mimeType;
@@ -372,6 +423,7 @@
           document.querySelectorAll('.format-item').forEach(i => i.classList.remove('selected'));
           item.classList.add('selected');
           selectedItag = f.itag;
+          selectedVideoOnly = f.videoOnly;
           document.getElementById('download-btn').disabled = false;
         });
 
@@ -379,39 +431,60 @@
       });
     }
 
-    async function startDownload() {
+    function startDownload() {
       if (!selectedItag || !currentURL) return;
-
-      const selectedItem = document.querySelector('.format-item.selected');
-      const isVideoOnly = selectedItem && selectedItem.dataset.videoOnly === 'true';
-      const loadingMsg = isVideoOnly
-        ? 'Mendownload video + audio lalu merge dengan ffmpeg... Mohon tunggu.'
-        : 'Mendownload video ke server... Mohon tunggu.';
+      if (activeES) { activeES.close(); activeES = null; }
 
       document.getElementById('download-btn').disabled = true;
-      setStatus('loading', loadingMsg);
+      hideProgress();
+      clearStatus();
+      setStatus('loading', 'Memulai download...');
 
-      try {
-        const res = await fetch('/api/download', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: currentURL, itag: selectedItag, videoOnly: isVideoOnly }),
-        });
-        const data = await res.json();
+      const params = new URLSearchParams({
+        url: currentURL,
+        itag: selectedItag,
+        videoOnly: selectedVideoOnly ? 'true' : 'false',
+      });
 
-        if (data.success) {
+      const es = new EventSource('/api/download?' + params.toString());
+      activeES = es;
+
+      es.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'progress') {
+          clearStatus();
+          showProgress(data.phase, data.pct, data.speed, data.eta);
+
+        } else if (data.type === 'merging') {
+          clearStatus();
+          showMerging();
+
+        } else if (data.type === 'done') {
+          es.close();
+          activeES = null;
+          hideProgress();
           setStatus('success', `Download selesai! File disimpan: output/${data.filename}`);
-        } else {
-          setStatus('error', 'Error: ' + data.error);
+          document.getElementById('download-btn').disabled = false;
+
+        } else if (data.type === 'error') {
+          es.close();
+          activeES = null;
+          hideProgress();
+          setStatus('error', 'Error: ' + data.message);
+          document.getElementById('download-btn').disabled = false;
         }
-      } catch (e) {
-        setStatus('error', 'Gagal terhubung ke server.');
-      } finally {
+      };
+
+      es.onerror = () => {
+        es.close();
+        activeES = null;
+        hideProgress();
+        setStatus('error', 'Koneksi ke server terputus.');
         document.getElementById('download-btn').disabled = false;
-      }
+      };
     }
 
-    // Enter key support
     document.getElementById('url-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') fetchFormats();
     });
