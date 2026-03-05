@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -183,7 +184,7 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("opening stream", "itag", selectedFormat.ItagNo)
-	stream, _, err := client.GetStream(video, selectedFormat)
+	stream, _, err := client.GetStreamContext(context.Background(), video, selectedFormat)
 	if err != nil {
 		slog.Error("GetStream failed",
 			"itag", selectedFormat.ItagNo,
