@@ -5,6 +5,7 @@ Aplikasi web sederhana untuk mendownload video YouTube. Pilih URL, pilih resolus
 ## Prasyarat
 
 - [Go](https://golang.org/) 1.23+
+- [ffmpeg](https://ffmpeg.org/) — diperlukan untuk format 1080p ke atas
 
 ## Cara Pakai
 
@@ -29,16 +30,17 @@ Buka browser ke **http://localhost:8080**
 3. Pilih format yang diinginkan
 4. Klik **Download** — video akan didownload ke folder `output/`
 
-## Catatan Format
+## Format & Kualitas
 
-| Tipe | Ekstensi | Keterangan |
-|------|----------|------------|
-| `video/mp4` | `.mp4` | Video + audio (biasanya ≤720p) |
-| `video/webm` | `.webm` | Video saja (1080p+, tanpa audio) |
-| `audio/mp4` | `.m4a` | Audio saja |
-| `audio/webm` | `.webm` | Audio saja |
+| Badge | Tipe | Keterangan |
+|-------|------|------------|
+| **Video** | `video/mp4` | Video + audio dalam satu file (≤720p) |
+| **HD** | `video/mp4` / `video/webm` | Video-only 1080p+, otomatis di-merge dengan audio via ffmpeg |
+| **Audio** | `audio/mp4` / `audio/webm` | Audio saja (`.m4a` / `.webm`) |
 
-> Format 1080p ke atas di YouTube menggunakan adaptive streaming (video dan audio terpisah). Untuk menggabungkannya, diperlukan `ffmpeg` secara manual setelah download.
+Format **HD** akan otomatis mendownload stream video dan audio secara terpisah, lalu menggabungkannya tanpa re-encode menggunakan ffmpeg.
+
+Jika download gagal karena koneksi terputus, server akan mencoba ulang otomatis hingga 3 kali.
 
 ## Struktur
 
@@ -55,8 +57,27 @@ Buka browser ke **http://localhost:8080**
 ### `GET /api/formats?url=<youtube-url>`
 Mengembalikan info video dan daftar format yang tersedia.
 
+**Response:**
+```json
+{
+  "title": "Judul Video",
+  "author": "Nama Channel",
+  "formats": [
+    {
+      "itag": 22,
+      "quality": "hd720",
+      "mimeType": "video/mp4",
+      "resolution": "720p",
+      "fps": 30,
+      "audioOnly": false,
+      "videoOnly": false
+    }
+  ]
+}
+```
+
 ### `POST /api/download`
 ```json
 { "url": "https://youtube.com/watch?v=...", "itag": 22 }
 ```
-Mendownload video ke server dan mengembalikan nama file yang disimpan.
+Mendownload video ke server dan mengembalikan nama file yang disimpan di folder `output/`. Untuk format video-only (HD), proses mencakup download video, download audio, dan merge dengan ffmpeg.

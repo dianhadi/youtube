@@ -172,6 +172,7 @@
     }
 
     .badge-video { background: #1e3a5f; color: #60a5fa; }
+    .badge-video-only { background: #3a2a0a; color: #fbbf24; }
     .badge-audio { background: #1e3d2f; color: #4ade80; }
 
     .format-detail {
@@ -343,19 +344,27 @@
         const item = document.createElement('label');
         item.className = 'format-item';
         item.dataset.itag = f.itag;
+        item.dataset.videoOnly = f.videoOnly;
 
-        const badgeClass = f.audioOnly ? 'badge-audio' : 'badge-video';
-        const badgeText = f.audioOnly ? 'Audio' : 'Video';
+        let badgeClass, badgeText;
+        if (f.audioOnly) {
+          badgeClass = 'badge-audio'; badgeText = 'Audio';
+        } else if (f.videoOnly) {
+          badgeClass = 'badge-video-only'; badgeText = 'HD';
+        } else {
+          badgeClass = 'badge-video'; badgeText = 'Video';
+        }
 
         const fps = f.fps && !f.audioOnly ? ` · ${f.fps}fps` : '';
         const mime = f.mimeType.split('/')[1] || f.mimeType;
+        const mergeNote = f.videoOnly ? ' · <span style="color:#fbbf24">+ auto-merge audio</span>' : '';
 
         item.innerHTML = `
           <input type="radio" name="format" value="${f.itag}" />
           <span class="format-badge ${badgeClass}">${badgeText}</span>
           <div class="format-detail">
             <div class="format-res">${f.resolution || f.quality}</div>
-            <div class="format-meta">${mime}${fps} · itag ${f.itag}</div>
+            <div class="format-meta">${mime}${fps} · itag ${f.itag}${mergeNote}</div>
           </div>
         `;
 
@@ -373,14 +382,20 @@
     async function startDownload() {
       if (!selectedItag || !currentURL) return;
 
+      const selectedItem = document.querySelector('.format-item.selected');
+      const isVideoOnly = selectedItem && selectedItem.dataset.videoOnly === 'true';
+      const loadingMsg = isVideoOnly
+        ? 'Mendownload video + audio lalu merge dengan ffmpeg... Mohon tunggu.'
+        : 'Mendownload video ke server... Mohon tunggu.';
+
       document.getElementById('download-btn').disabled = true;
-      setStatus('loading', 'Mendownload video ke server... Mohon tunggu.');
+      setStatus('loading', loadingMsg);
 
       try {
         const res = await fetch('/api/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: currentURL, itag: selectedItag }),
+          body: JSON.stringify({ url: currentURL, itag: selectedItag, videoOnly: isVideoOnly }),
         });
         const data = await res.json();
 
