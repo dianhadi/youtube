@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f1f1f1;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 36px;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #ff4444;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #aaa;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #f1f1f1;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #ff4444;
+    }
+
+    input[type="text"]::placeholder {
+      color: #555;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: #ff4444;
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+
+    .btn-download {
+      width: 100%;
+      background: #22c55e;
+      color: #fff;
+      padding: 14px;
+      font-size: 1rem;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-download:hover:not(:disabled) { opacity: 0.85; }
+
+    /* Video info */
+    #video-info {
+      background: #252525;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    #video-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    #video-author {
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    /* Format list */
+    #format-section { display: none; }
+
+    .format-grid {
+      display: grid;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .format-grid::-webkit-scrollbar { width: 4px; }
+    .format-grid::-webkit-scrollbar-track { background: #1a1a1a; }
+    .format-grid::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+    .format-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: #252525;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .format-item:hover { background: #2e2e2e; }
+    .format-item.selected { border-color: #ff4444; background: #2a1a1a; }
+
+    .format-item input[type="radio"] { display: none; }
+
+    .format-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      min-width: 56px;
+      text-align: center;
+    }
+
+    .badge-video { background: #1e3a5f; color: #60a5fa; }
+    .badge-audio { background: #1e3d2f; color: #4ade80; }
+
+    .format-detail {
+      flex: 1;
+    }
+
+    .format-res {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .format-meta {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* Status */
+    #status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      display: none;
+    }
+
+    #status.loading {
+      background: #1e2a3a;
+      color: #60a5fa;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #status.success {
+      background: #1a2f1f;
+      color: #4ade80;
+      display: block;
+    }
+
+    #status.error {
+      background: #2f1a1a;
+      color: #f87171;
+      display: block;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #2a4a6a;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>YouTube Downloader</h1>
+    <p class="subtitle">Masukan URL video, pilih resolusi, lalu download.</p>
+
+    <label for="url-input">URL Video</label>
+    <div class="input-row">
+      <input
+        type="text"
+        id="url-input"
+        placeholder="https://www.youtube.com/watch?v=..."
+        autofocus
+      />
+      <button class="btn-primary" id="fetch-btn" onclick="fetchFormats()">Cek Format</button>
+    </div>
+
+    <div id="video-info">
+      <div id="video-title"></div>
+      <div id="video-author"></div>
+    </div>
+
+    <div id="format-section">
+      <div class="section-title">Pilih Resolusi / Format</div>
+      <div class="format-grid" id="format-list"></div>
+      <button class="btn-download" id="download-btn" onclick="startDownload()" disabled>
+        Download
+      </button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    let selectedItag = null;
+    let currentURL = '';
+
+    function setStatus(type, msg) {
+      const el = document.getElementById('status');
+      el.className = type;
+      if (type === 'loading') {
+        el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+      } else {
+        el.textContent = msg;
+      }
+      el.style.display = '';
+    }
+
+    function clearStatus() {
+      const el = document.getElementById('status');
+      el.style.display = 'none';
+      el.className = '';
+    }
+
+    async function fetchFormats() {
+      const url = document.getElementById('url-input').value.trim();
+      if (!url) { setStatus('error', 'URL tidak boleh kosong.'); return; }
+
+      currentURL = url;
+      selectedItag = null;
+
+      document.getElementById('fetch-btn').disabled = true;
+      document.getElementById('video-info').style.display = 'none';
+      document.getElementById('format-section').style.display = 'none';
+      document.getElementById('download-btn').disabled = true;
+      setStatus('loading', 'Mengambil informasi video...');
+
+      try {
+        const res = await fetch(`/api/formats?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+
+        if (data.error) { setStatus('error', 'Error: ' + data.error); return; }
+
+        document.getElementById('video-title').textContent = data.title;
+        document.getElementById('video-author').textContent = 'oleh ' + data.author;
+        document.getElementById('video-info').style.display = 'block';
+
+        renderFormats(data.formats);
+        document.getElementById('format-section').style.display = 'block';
+        clearStatus();
+      } catch (e) {
+        setStatus('error', 'Gagal terhubung ke server.');
+      } finally {
+        document.getElementById('fetch-btn').disabled = false;
+      }
+    }
+
+    function renderFormats(formats) {
+      const list = document.getElementById('format-list');
+      list.innerHTML = '';
+
+      // Sort: video first (highest res), then audio
+      const videos = formats.filter(f => !f.audioOnly).sort((a, b) => {
+        const ra = parseInt(a.resolution) || 0;
+        const rb = parseInt(b.resolution) || 0;
+        return rb - ra;
+      });
+      const audios = formats.filter(f => f.audioOnly);
+      const sorted = [...videos, ...audios];
+
+      sorted.forEach(f => {
+        const item = document.createElement('label');
+        item.className = 'format-item';
+        item.dataset.itag = f.itag;
+
+        const badgeClass = f.audioOnly ? 'badge-audio' : 'badge-video';
+        const badgeText = f.audioOnly ? 'Audio' : 'Video';
+
+        const fps = f.fps && !f.audioOnly ? ` · ${f.fps}fps` : '';
+        const mime = f.mimeType.split('/')[1] || f.mimeType;
+
+        item.innerHTML = `
+          <input type="radio" name="format" value="${f.itag}" />
+          <span class="format-badge ${badgeClass}">${badgeText}</span>
+          <div class="format-detail">
+            <div class="format-res">${f.resolution || f.quality}</div>
+            <div class="format-meta">${mime}${fps} · itag ${f.itag}</div>
+          </div>
+        `;
+
+        item.addEventListener('click', () => {
+          document.querySelectorAll('.format-item').forEach(i => i.classList.remove('selected'));
+          item.classList.add('selected');
+          selectedItag = f.itag;
+          document.getElementById('download-btn').disabled = false;
+        });
+
+        list.appendChild(item);
+      });
+    }
+
+    async function startDownload() {
+      if (!selectedItag || !currentURL) return;
+
+      document.getElementById('download-btn').disabled = true;
+      setStatus('loading', 'Mendownload video ke server... Mohon tunggu.');
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: currentURL, itag: selectedItag }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          setStatus('success', `Download selesai! File disimpan: output/${data.filename}`);
+        } else {
+          setStatus('error', 'Error: ' + data.error);
+        }
+      } catch (e) {
+        setStatus('error', 'Gagal terhubung ke server.');
+      } finally {
+        document.getElementById('download-btn').disabled = false;
+      }
+    }
+
+    // Enter key support
+    document.getElementById('url-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchFormats();
+    });
+  </script>
+</body>
+</html>
