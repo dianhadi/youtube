@@ -1,70 +1,69 @@
 # YouTube Downloader
 
-Aplikasi web sederhana untuk mendownload video YouTube. Pilih URL, pilih resolusi, download — selesai.
+A simple web app to download YouTube videos. Enter a URL, pick a resolution, and download.
 
-## Prasyarat
+## Prerequisites
 
 - [Go](https://golang.org/) 1.23+
-- [ffmpeg](https://ffmpeg.org/) — diperlukan untuk format 1080p ke atas
-
-## Cara Pakai
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — handles downloading and format extraction
+- [ffmpeg](https://ffmpeg.org/) — required for merging 1080p+ video and audio streams
 
 ```bash
-# Clone & masuk ke direktori
+# macOS
+brew install yt-dlp ffmpeg
+```
+
+## Usage
+
+```bash
 git clone https://github.com/dianhadi/youtube
 cd youtube
 
-# Install dependencies
 go mod tidy
-
-# Jalankan server
 go run main.go
 ```
 
-Buka browser ke **http://localhost:8080**
+Open **http://localhost:8080** in your browser.
 
-## Alur
+## How it works
 
-1. Masukan URL video YouTube
-2. Klik **Cek Format** — daftar resolusi yang tersedia akan muncul
-3. Pilih format yang diinginkan
-4. Klik **Download** — video akan didownload ke folder `output/`
+1. Enter a YouTube URL and click **Check Formats**
+2. Select a resolution or audio format
+3. Click **Download** — the file is saved to the `output/` folder with a real-time progress bar
 
-## Format & Kualitas
+## Format types
 
-| Badge | Tipe | Keterangan |
-|-------|------|------------|
-| **Video** | `video/mp4` | Video + audio dalam satu file (≤720p) |
-| **HD** | `video/mp4` / `video/webm` | Video-only 1080p+, otomatis di-merge dengan audio via ffmpeg |
-| **Audio** | `audio/mp4` / `audio/webm` | Audio saja (`.m4a` / `.webm`) |
+| Badge | Type | Description |
+|-------|------|-------------|
+| **Video** | `video/mp4` | Combined video + audio (≤720p) |
+| **HD** | `video/mp4` / `video/webm` | Video-only 1080p+, automatically merged with best audio via yt-dlp + ffmpeg |
+| **Audio** | `audio/mp4` / `audio/webm` | Audio only (`.m4a` / `.webm`) |
 
-Format **HD** akan otomatis mendownload stream video dan audio secara terpisah, lalu menggabungkannya tanpa re-encode menggunakan ffmpeg.
+HD formats automatically download the video and audio streams separately and merge them without re-encoding.
 
-Jika download gagal karena koneksi terputus, server akan mencoba ulang otomatis hingga 3 kali.
-
-## Struktur
+## Project structure
 
 ```
 .
-├── main.go         # Web server & API handler
+├── main.go         # Go web server & API handlers
 ├── static/
 │   └── index.html  # Frontend UI
-└── output/         # Hasil download (dibuat otomatis)
+└── output/         # Downloaded files (created automatically)
 ```
 
 ## API
 
 ### `GET /api/formats?url=<youtube-url>`
-Mengembalikan info video dan daftar format yang tersedia.
+Returns video metadata and available formats.
 
 **Response:**
 ```json
 {
-  "title": "Judul Video",
-  "author": "Nama Channel",
+  "title": "Video Title",
+  "author": "Channel Name",
   "formats": [
     {
-      "itag": 22,
+      "itag": "22",
       "quality": "hd720",
       "mimeType": "video/mp4",
       "resolution": "720p",
@@ -76,8 +75,12 @@ Mengembalikan info video dan daftar format yang tersedia.
 }
 ```
 
-### `POST /api/download`
-```json
-{ "url": "https://youtube.com/watch?v=...", "itag": 22 }
-```
-Mendownload video ke server dan mengembalikan nama file yang disimpan di folder `output/`. Untuk format video-only (HD), proses mencakup download video, download audio, dan merge dengan ffmpeg.
+### `GET /api/download?url=<youtube-url>&itag=<id>&videoOnly=<bool>`
+Streams download progress via **Server-Sent Events**. Each event is a JSON object:
+
+| `type` | Payload | Description |
+|--------|---------|-------------|
+| `progress` | `pct`, `phase`, `speed`, `eta` | Download progress |
+| `merging` | — | ffmpeg merge in progress |
+| `done` | `filename` | Download complete |
+| `error` | `message` | Something went wrong |
