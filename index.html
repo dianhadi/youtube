@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Playlist Viewer</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #aaa;
+      margin-bottom: 30px;
+    }
+
+    .playlist-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .playlist-input input {
+      flex: 1;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #222;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .playlist-input input:focus {
+      outline: none;
+      border-color: #888;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .remove-btn {
+      background: #333;
+      color: #fff;
+    }
+
+    .remove-btn:hover {
+      background: #555;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .add-btn {
+      background: #333;
+      color: #fff;
+    }
+
+    .submit-btn {
+      background: #ff0033;
+      color: white;
+    }
+
+    .back-btn {
+      background: #333;
+      color: white;
+      margin-bottom: 25px;
+    }
+
+    .error {
+      color: #ff6b6b;
+      margin-top: 15px;
+    }
+
+    #viewerPage {
+      display: none;
+    }
+
+    .playlist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 20px;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .video-wrapper iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    @media (max-width: 600px) {
+      .playlist-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .playlist-input {
+        flex-direction: column;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- INPUT PAGE -->
+  <div id="inputPage" class="container">
+    <h1>YouTube Playlist Viewer</h1>
+
+    <div class="subtitle">
+      Add one or more YouTube playlist URLs.
+    </div>
+
+    <div id="playlistInputs"></div>
+
+    <div class="actions">
+      <button class="add-btn" onclick="addPlaylistInput()">
+        + Add More
+      </button>
+
+      <button class="submit-btn" onclick="loadPlaylists()">
+        ▶ Load Playlists
+      </button>
+    </div>
+
+    <div id="error" class="error"></div>
+  </div>
+
+
+  <!-- VIEWER PAGE -->
+  <div id="viewerPage" class="container">
+
+    <button class="back-btn" onclick="goBack()">
+      ← Back
+    </button>
+
+    <h1>Playing Playlists</h1>
+
+    <div class="subtitle">
+      All playlists are playing muted.
+    </div>
+
+    <div id="playlistGrid" class="playlist-grid"></div>
+
+  </div>
+
+
+  <script>
+
+    /*
+     * Add playlist URL input
+     */
+    function addPlaylistInput(value = "") {
+
+      const container = document.getElementById("playlistInputs");
+
+      const row = document.createElement("div");
+      row.className = "playlist-input";
+
+      const input = document.createElement("input");
+
+      input.type = "text";
+      input.placeholder =
+        "https://www.youtube.com/playlist?list=PLxxxxxxxx";
+
+      input.value = value;
+
+      const removeButton = document.createElement("button");
+
+      removeButton.innerText = "Remove";
+      removeButton.className = "remove-btn";
+
+      removeButton.onclick = function () {
+
+        row.remove();
+
+        // Always keep at least one input
+        if (
+          document.querySelectorAll(".playlist-input").length === 0
+        ) {
+          addPlaylistInput();
+        }
+      };
+
+      row.appendChild(input);
+      row.appendChild(removeButton);
+
+      container.appendChild(row);
+    }
+
+
+    /*
+     * Extract playlist ID from different YouTube URL formats
+     */
+    function extractPlaylistId(url) {
+
+      try {
+
+        const parsed = new URL(url);
+
+        const playlistId =
+          parsed.searchParams.get("list");
+
+        if (playlistId) {
+          return playlistId;
+        }
+
+      } catch (e) {
+        return null;
+      }
+
+      return null;
+    }
+
+
+    /*
+     * Load all playlists
+     */
+    function loadPlaylists() {
+
+      const inputs =
+        document.querySelectorAll(".playlist-input input");
+
+      const playlistIds = [];
+
+      const error =
+        document.getElementById("error");
+
+      error.innerText = "";
+
+      inputs.forEach(input => {
+
+        const value = input.value.trim();
+
+        if (!value) {
+          return;
+        }
+
+        const playlistId =
+          extractPlaylistId(value);
+
+        if (playlistId) {
+          playlistIds.push(playlistId);
+        }
+
+      });
+
+
+      if (playlistIds.length === 0) {
+
+        error.innerText =
+          "Please enter at least one valid YouTube playlist URL.";
+
+        return;
+      }
+
+
+      /*
+       * Switch page
+       */
+      document.getElementById("inputPage").style.display =
+        "none";
+
+      document.getElementById("viewerPage").style.display =
+        "block";
+
+
+      const grid =
+        document.getElementById("playlistGrid");
+
+      grid.innerHTML = "";
+
+
+      /*
+       * Create iframe for every playlist
+       */
+      playlistIds.forEach((playlistId) => {
+
+        const wrapper =
+          document.createElement("div");
+
+        wrapper.className =
+          "video-wrapper";
+
+
+        const iframe =
+          document.createElement("iframe");
+
+
+        /*
+         * autoplay=1
+         * mute=1
+         * loop=1
+         *
+         * Muted autoplay is generally allowed
+         * by modern browsers. Loop restarts the playlist
+         * after the final video finishes.
+         */
+        iframe.src =
+          "https://www.youtube.com/embed/videoseries" +
+          "?list=" +
+          encodeURIComponent(playlistId) +
+          "&autoplay=1" +
+          "&mute=1" +
+          "&loop=1";
+
+
+        iframe.allow =
+          "accelerometer; autoplay; clipboard-write; " +
+          "encrypted-media; gyroscope; picture-in-picture; web-share";
+
+
+        iframe.allowFullscreen = true;
+
+
+        wrapper.appendChild(iframe);
+
+        grid.appendChild(wrapper);
+
+      });
+
+    }
+
+
+    /*
+     * Return to input page
+     */
+    function goBack() {
+
+      /*
+       * Remove iframe so playback stops
+       */
+      document.getElementById("playlistGrid").innerHTML =
+        "";
+
+      document.getElementById("viewerPage").style.display =
+        "none";
+
+      document.getElementById("inputPage").style.display =
+        "block";
+
+    }
+
+
+    /*
+     * Initial input
+     */
+    addPlaylistInput();
+
+  </script>
+
+</body>
+</html>
